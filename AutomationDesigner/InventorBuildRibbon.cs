@@ -608,6 +608,7 @@ namespace AutomationDesigner
                 new CommandItem(Commands.Comment, "", "", "", "", "", "No cells are processed for user comments"),
                 new CommandItem(Commands.SetProperty, "Name of the property", ConstantStrings.ParentText, "Value to set the property"),
                 new CommandItem(Commands.GetProperty, "Name of the property", ConstantStrings.ParentText, "Application will set the value of the property here"),
+                new CommandItem(Commands.GetEquationValue, "Name of the global variable / equation", ConstantStrings.ParentText, "Application will set the evaluated value here", applicationType: ApplicationTypeEnum.Solidworks),
                 new CommandItem(Commands.SetLevelOfDetail, "Name of the Level Detail", ConstantStrings.ParentText, "", "", "", "Activates the level detail and creates it if not does not exist", applicationType: ApplicationTypeEnum.Inventor),
                 new CommandItem(Commands.SetDesignViewRep, "Name of the Design View Representation", ConstantStrings.ParentText, "", "", "", "Activates the Design View and creates it if not does not exist", applicationType: ApplicationTypeEnum.Inventor),
                 new CommandItem(Commands.ComponentVisiblity, "Name of component in the tree followed by occurrence number", ConstantStrings.ParentText, "True or False if the component is visible"),
