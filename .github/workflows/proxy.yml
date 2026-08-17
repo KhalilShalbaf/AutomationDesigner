@@ -1,66 +1,33 @@
-name: Ultimate Proxy Download
+name: CLI Proxy Download
 on: workflow_dispatch
 
 jobs:
-  smart_proxy:
+  download_and_proxy:
     runs-on: ubuntu-latest
     permissions:
-      actions: read # اجازه خواندن آرتیفکت‌های ورکفلوهای دیگر
+      actions: read
+      contents: read
       
     steps:
-      - name: Download Artifact from Previous Run
-        uses: dawidd6/action-download-artifact@v6
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          run_id: 31940981870 # شناسه اجرایی که فایل ۳ مگابایتی را ساخت
-          name: AutomationDesigner-Installer
-          path: ./artifact-files/
-          
-      - name: Verify File Size (Anti-0.14KB Check)
-        id: check
+      - name: Download via GitHub CLI (Bulletproof Method)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          FILE="./artifact-files/AutomationDesigner-Installer.zip"
-          if [ -f "$FILE" ]; then
-            SIZE=$(stat -c%s "$FILE")
-            echo "File found: $FILE"
-            echo "Size: $SIZE bytes"
-            
-            # اگر حجم کمتر از ۱ مگابایت بود، هشدار می‌دهیم
-            if [ $SIZE -lt 1000000 ]; then
-              echo "::warning::File size is small! It might be the wrong file."
-            else
-              echo "::notice::File size is correct (~3MB). Proceeding..."
-            fi
-            echo "exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "::error::File not found! Listing directory:"
-            ls -R ./artifact-files/
-            echo "exists=false" >> $GITHUB_OUTPUT
-          fi
+          echo "در حال دانلود آرتیفکت با ابزار رسمی GitHub CLI..."
+          # دانلود مستقیم از طریق شناسه اجرای قبلی
+          gh run download 31940981870 -n "AutomationDesigner-Installer" --repo KhalilShalbaf/AutomationDesigner
+          
+          echo "=== بررسی فایل دانلود شده ==="
+          ls -lh AutomationDesigner-Installer.zip
+          file AutomationDesigner-Installer.zip
+          echo "================================="
 
       - name: Upload to file.io (Direct Link)
-        if: steps.check.outputs.exists == 'true'
         run: |
-          echo "=============================================="
-          echo "LINK 1 (file.io):"
-          curl -s -F "file=@./artifact-files/AutomationDesigner-Installer.zip" https://file.io | jq -r '.link'
-          echo "=============================================="
+          echo "لینک دانلود از file.io:"
+          curl -s -F "file=@./AutomationDesigner-Installer.zip" https://file.io | jq -r '.link'
 
-      - name: Upload to tmpfiles.org (Direct Link Generator)
-        if: steps.check.outputs.exists == 'true'
+      - name: Upload to catbox.moe (Direct Link)
         run: |
-          echo "=============================================="
-          echo "LINK 2 (tmpfiles.org - Direct):"
-          RESPONSE=$(curl -s -F "file=@./artifact-files/AutomationDesigner-Installer.zip" https://tmpfiles.org/api/v1/upload)
-          URL=$(echo $RESPONSE | jq -r '.data.url')
-          
-          if [ "$URL" != "null" ] && [ ! -z "$URL" ]; then
-             # تبدیل لینک صفحه به لینک دانلود مستقیم با اضافه کردن /dl/
-             DIRECT_URL=$(echo $URL | sed 's|tmpfiles.org/|tmpfiles.org/dl/|')
-             echo "$DIRECT_URL"
-             echo "::notice::Copy this direct link: $DIRECT_URL"
-          else
-             echo "Failed to get URL from tmpfiles"
-             echo $RESPONSE
-          fi
-          echo "=============================================="
+          echo "لینک دانلود از catbox.moe:"
+          curl -s -F "reqtype=fileupload" -F "fileToUpload=@./AutomationDesigner-Installer.zip" https://catbox.moe/user/api.php
