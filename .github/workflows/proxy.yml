@@ -1,5 +1,7 @@
 name: CLI Proxy Download
-on: workflow_dispatch
+
+on:
+  workflow_dispatch:
 
 jobs:
   download_and_proxy:
@@ -7,27 +9,37 @@ jobs:
     permissions:
       actions: read
       contents: read
-      
+
     steps:
-      - name: Download via GitHub CLI (Bulletproof Method)
+      - name: Find latest successful build
+        id: find
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "در حال دانلود آرتیفکت با ابزار رسمی GitHub CLI..."
-          # دانلود مستقیم از طریق شناسه اجرای قبلی
-          gh run download 31940981870 -n "AutomationDesigner-Installer" --repo KhalilShalbaf/AutomationDesigner
-          
-          echo "=== بررسی فایل دانلود شده ==="
-          ls -lh AutomationDesigner-Installer.zip
-          file AutomationDesigner-Installer.zip
-          echo "================================="
+          RUN_ID=$(gh run list --repo KhalilShalbaf/AutomationDesigner --status success --limit 10 \
+            --json databaseId,name \
+            --jq '[.[] | select(.name == "Build AutomationDesigner")][0].databaseId')
+          echo "شناسه آخرین بیلد موفق: $RUN_ID"
+          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
 
-      - name: Upload to file.io (Direct Link)
+      - name: Download and zip artifact
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "لینک دانلود از file.io:"
+          gh run download "${{ steps.find.outputs.run_id }}" -n "AutomationDesigner-Installer" --dir ./dl --repo KhalilShalbaf/AutomationDesigner
+          echo "فایل‌های دانلود شده:"
+          find ./dl -type f
+          cd ./dl
+          zip -r ../AutomationDesigner-Installer.zip .
+          cd ..
+          ls -lh AutomationDesigner-Installer.zip
+
+      - name: Upload to file.io
+        run: |
+          echo "=== لینک file.io ==="
           curl -s -F "file=@./AutomationDesigner-Installer.zip" https://file.io | jq -r '.link'
 
-      - name: Upload to catbox.moe (Direct Link)
+      - name: Upload to catbox.moe
         run: |
-          echo "لینک دانلود از catbox.moe:"
+          echo "=== لینک catbox.moe ==="
           curl -s -F "reqtype=fileupload" -F "fileToUpload=@./AutomationDesigner-Installer.zip" https://catbox.moe/user/api.php
