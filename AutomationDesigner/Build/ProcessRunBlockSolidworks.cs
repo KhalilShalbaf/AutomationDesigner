@@ -154,6 +154,9 @@ namespace AutomationDesigner.Build
                     case Commands.Equation:
                         _methods.SetEquation(_workingDocument, GetString(i, nameCol), GetDouble(i, value));
                         break;
+                    case Commands.GetEquationValue:
+                        SetValue(i, value, _methods.GetEquation(_workingDocument, GetString(i, nameCol)));
+                        break;
                     case Commands.SetProperty:
                         _methods.SetProperty(_workingDocument, GetString(i, nameCol), GetString(i, value));
                         break;
