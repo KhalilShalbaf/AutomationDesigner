@@ -1,0 +1,56 @@
+name: Raw GitHub Download
+
+on:
+  workflow_dispatch:
+
+jobs:
+  push_to_branch:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+
+    steps:
+      - name: Find latest successful build
+        id: find
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RUN_ID=$(gh run list --repo KhalilShalbaf/AutomationDesigner --status success --limit 10 \
+            --json databaseId,name \
+            --jq '[.[] | select(.name == "Build AutomationDesigner")][0].databaseId')
+          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Download artifact
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh run download "${{ steps.find.outputs.run_id }}" -n "AutomationDesigner-Installer" --dir ./dl --repo KhalilShalbaf/AutomationDesigner
+          cd ./dl
+          zip -r ../AutomationDesigner-Installer.zip .
+          cd ..
+          ls -lh AutomationDesigner-Installer.zip
+
+      - name: Push to artifact-build branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir ./git-repo
+          cd ./git-repo
+          git init
+          git config --global user.email "action@github.com"
+          git config --global user.name "GitHub Action"
+          cp ../AutomationDesigner-Installer.zip .
+          echo "# AutomationDesigner Installer Build" > README.md
+          git add .
+          git commit -m "Add installer artifact - $(date)"
+          git branch -M artifact-build
+          git remote add origin https://x-access-token:${GH_TOKEN}@github.com/KhalilShalbaf/AutomationDesigner.git
+          git push -f origin artifact-build
+
+      - name: Display raw download links
+        run: |
+          echo "========================================================="
+          echo "لینک دانلود مستقیم:"
+          echo "https://raw.githubusercontent.com/KhalilShalbaf/AutomationDesigner/artifact-build/AutomationDesigner-Installer.zip"
+          echo "========================================================="
