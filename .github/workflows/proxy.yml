@@ -22,24 +22,54 @@ jobs:
           echo "شناسه آخرین بیلد موفق: $RUN_ID"
           echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
 
-      - name: Download and zip artifact
+      - name: Download artifact
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          echo "در حال دانلود آرتیفکت..."
           gh run download "${{ steps.find.outputs.run_id }}" -n "AutomationDesigner-Installer" --dir ./dl --repo KhalilShalbaf/AutomationDesigner
-          echo "فایل‌های دانلود شده:"
-          find ./dl -type f
-          cd ./dl
-          zip -r ../AutomationDesigner-Installer.zip .
-          cd ..
+          
+          echo "=== بررسی فایل‌های دانلود شده ==="
+          find ./dl -type f -exec ls -lh {} \;
+          
+          # اگر فقط یک فایل زیپ است، آن را کپی می‌کنیم
+          if [ -f "./dl/AutomationDesigner-Installer.zip" ]; then
+            cp ./dl/AutomationDesigner-Installer.zip ./AutomationDesigner-Installer.zip
+          else
+            # اگر فایل‌ها به صورت Extracted هستند، دوباره زیپ می‌کنیم
+            cd ./dl
+            zip -r ../AutomationDesigner-Installer.zip .
+            cd ..
+          fi
+          
+          echo "=== فایل نهایی ==="
           ls -lh AutomationDesigner-Installer.zip
+          file AutomationDesigner-Installer.zip
 
-      - name: Upload to file.io
+      - name: Upload to file.io (Raw Output)
         run: |
-          echo "=== لینک file.io ==="
-          curl -s -F "file=@./AutomationDesigner-Installer.zip" https://file.io | jq -r '.link'
+          echo "=== خروجی خام file.io ==="
+          curl -s -F "file=@./AutomationDesigner-Installer.zip" https://file.io
+          echo ""
+          echo "=== پایان ==="
+
+      - name: Upload to 0x0.st
+        run: |
+          echo "=== لینک 0x0.st ==="
+          curl -s -F "file=@./AutomationDesigner-Installer.zip" https://0x0.st
+          echo ""
+          echo "=== پایان ==="
 
       - name: Upload to catbox.moe
         run: |
           echo "=== لینک catbox.moe ==="
           curl -s -F "reqtype=fileupload" -F "fileToUpload=@./AutomationDesigner-Installer.zip" https://catbox.moe/user/api.php
+          echo ""
+          echo "=== پایان ==="
+
+      - name: Upload to litterbox (Temporary catbox)
+        run: |
+          echo "=== لینک litterbox (موقت ۱ ساعته) ==="
+          curl -s -F "reqtype=fileupload" -F "time=1h" -F "fileToUpload=@./AutomationDesigner-Installer.zip" https://litterbox.catbox.moe/resources/internals/api.php
+          echo ""
+          echo "=== پایان ==="
