@@ -28,8 +28,7 @@ jobs:
       - name: Build
         shell: pwsh
         run: |
-          msbuild AutomationDesigner.sln /p:Configuration=Release /p:Platform="Any CPU" /p:SignManifests=true /p:ManifestKeyFile="" /p:ManifestCertificateThumbprint=$env:CERT_THUMBPRINT /verbosity:minimal
-
+          msbuild AutomationDesigner.sln /p:Configuration=Release /p:Platform="Any CPU" /verbosity:minimal
       - name: Package
         shell: pwsh
         run: |
