@@ -28,8 +28,8 @@ jobs:
       - name: Build
         shell: pwsh
         run: |
-          msbuild AutomationDesigner.sln /p:Configuration=Release /p:Platform="Any CPU" /verbosity:minimal
-      - name: Package
+          msbuild AutomationDesigner.sln /p:Configuration=Release /p:Platform="Any CPU" /p:SignManifests=false /verbosity:minimal
+          - name: Package
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path "publish" | Out-Null
