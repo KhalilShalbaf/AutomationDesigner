@@ -1,0 +1,39 @@
+name: Proxy Download
+on: 
+  workflow_dispatch: # اجازه می‌دهد این ورکفلو را به صورت دستی اجرا کنید
+
+jobs:
+  proxy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Artifact via GitHub API
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "در حال دانلود فایل از سرورهای گیت‌هاب..."
+          # دانلود مستقیم فایل زیپ از طریق API رسمی گیت‌هاب
+          curl -L -H "Accept: application/vnd.github+json" \
+               -H "Authorization: Bearer $GH_TOKEN" \
+               -H "X-GitHub-Api-Version: 2022-11-28" \
+               https://api.github.com/repos/KhalilShalbaf/AutomationDesigner/actions/artifacts/9262012636/zip \
+               -o AutomationDesigner-Installer.zip
+               
+      - name: Verify Download
+        run: |
+          echo "بررسی فایل دانلود شده:"
+          ls -lh AutomationDesigner-Installer.zip
+          file AutomationDesigner-Installer.zip
+          
+      - name: Upload to file.io
+        run: |
+          echo "========================================="
+          echo "لینک دانلود از file.io:"
+          curl -F "file=@./AutomationDesigner-Installer.zip" https://file.io
+          echo "========================================="
+          
+      - name: Upload to tmpfiles.org
+        run: |
+          echo "========================================="
+          echo "لینک دانلود از tmpfiles.org (خروجی JSON است، url را کپی کنید):"
+          curl -F "file=@./AutomationDesigner-Installer.zip" https://tmpfiles.org/api/v1/upload
+          echo "========================================="
