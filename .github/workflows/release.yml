@@ -1,0 +1,30 @@
+name: Build and Release Installer
+on: 
+  workflow_dispatch: # دکمه اجرای دستی
+
+jobs:
+  build_and_release:
+    runs-on: windows-latest # یا همان سیستم عاملی که در ورکفلوی اصلی استفاده می‌کنید
+    permissions:
+      contents: write # مجوز لازم برای ساخت Release
+      
+    steps:
+      - uses: actions/checkout@v4
+      
+      # =====================================================
+      # در اینجا دقیقاً همان کدهای بیلد پروژه خودتان را کپی کنید
+      # مثلاً:
+      # - uses: microsoft/setup-msbuild@v2
+      # - run: msbuild YourProject.sln /p:Configuration=Release
+      # =====================================================
+      
+      - name: Create Release and Upload Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: installer-${{ github.run_number }}
+          name: Automation Designer Installer Build ${{ github.run_number }}
+          draft: false
+          prerelease: false
+          files: |
+            installer/AutomationDesigner-Installer.zip
+            # اگر مسیر فایل زیپ شما متفاوت است، اینجا را اصلاح کنید
