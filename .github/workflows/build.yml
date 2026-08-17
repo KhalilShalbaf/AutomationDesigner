@@ -1,61 +1,44 @@
-name: CLI Proxy Download
+name: Build
 
 on:
-  workflow_dispatch:
+  push:
+    branches: [ master ]
 
 jobs:
-  download_and_proxy:
-    runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      contents: write   # مجوز ساخت Release
-
+  build:
+    runs-on: windows-latest
     steps:
-      - name: Find latest successful build
-        id: find
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          RUN_ID=$(gh run list --repo KhalilShalbaf/AutomationDesigner --status success --limit 10 \
-            --json databaseId,name \
-            --jq '[.[] | select(.name == "Build AutomationDesigner")][0].databaseId')
-          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
 
-      - name: Download artifact and zip it
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh run download "${{ steps.find.outputs.run_id }}" -n "AutomationDesigner-Installer" --dir ./dl --repo KhalilShalbaf/AutomationDesigner
-          cd ./dl
-          zip -r ../AutomationDesigner-Installer.zip .
-          cd ..
-          ls -lh AutomationDesigner-Installer.zip
+      - name: Setup NuGet
+        uses: nuget/setup-nuget@v2
 
-      - name: Publish as GitHub Release (گزینه اصلی)
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          TAG="installer-$(date +%Y%m%d-%H%M%S)"
-          gh release create "$TAG" ./AutomationDesigner-Installer.zip \
-            --repo KhalilShalbaf/AutomationDesigner \
-            --title "AutomationDesigner Installer" \
-            --notes "لینک دانلود مستقیم فایل نصب"
-          echo "به صفحه Releases بروید: https://github.com/KhalilShalbaf/AutomationDesigner/releases"
+      - name: Restore
+        run: nuget restore AutomationDesigner.sln
 
-      - name: Fallback - tmpfiles.org (قبلاً در شبکه شما کار کرده)
+      - name: Create signing certificate
+        shell: pwsh
         run: |
-          echo "=== tmpfiles (فراموش نکنید /dl/ را اضافه کنید) ==="
-          curl -s -F "file=@./AutomationDesigner-Installer.zip" https://tmpfiles.org/api/v1/upload
-          echo ""
+          $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=GitHubActions" -CertStoreLocation "Cert:\CurrentUser\My"
+          "CERT_THUMBPRINT=$($cert.Thumbprint)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
-      - name: Fallback - pixeldrain
-        run: |
-          echo "=== pixeldrain ==="
-          curl -s -F "file=@./AutomationDesigner-Installer.zip" https://pixeldrain.com/api/file/
-          echo ""
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v2
 
-      - name: Fallback - uguu.se
+      - name: Build
+        shell: pwsh
         run: |
-          echo "=== uguu ==="
-          curl -s -F "files[]=@./AutomationDesigner-Installer.zip" https://uguu.se/upload
-          echo ""
+          msbuild AutomationDesigner.sln /p:Configuration=Release /p:Platform="Any CPU" /p:SignManifests=true /p:ManifestKeyFile="" /p:ManifestCertificateThumbprint=$env:CERT_THUMBPRINT /verbosity:minimal
+
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path "publish" | Out-Null
+          Copy-Item -Path "AutomationDesigner\bin\Release\*" -Destination "publish" -Recurse
+          Copy-Item -Path "INSTALL.bat" -Destination "publish"
+          Compress-Archive -Path "publish\*" -DestinationPath "AutomationDesigner-Setup.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AutomationDesigner-Setup
+          path: AutomationDesigner-Setup.zip
