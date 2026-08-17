@@ -1,44 +1,108 @@
-name: Build
+name: Build AutomationDesigner
 
 on:
   push:
     branches: [ master ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: windows-2022
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
 
       - name: Setup NuGet
         uses: nuget/setup-nuget@v2
 
-      - name: Restore
+      - name: Restore NuGet packages
         run: nuget restore AutomationDesigner.sln
 
-      - name: Create signing certificate
+      - name: Create certificate
         shell: pwsh
         run: |
-          $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=GitHubActions" -CertStoreLocation "Cert:\CurrentUser\My"
-          "CERT_THUMBPRINT=$($cert.Thumbprint)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          $cert = New-SelfSignedCertificate -Type CodeSigning -Subject "CN=AutomationDesigner Build" -CertStoreLocation "Cert:\CurrentUser\My" -KeyExportPolicy Exportable
+          $pwd = ConvertTo-SecureString -String "Build2024!" -Force -AsPlainText
+          $pfx = Join-Path $env:GITHUB_WORKSPACE "AutomationDesigner\AutomationDesigner_TemporaryKey.pfx"
+          Export-PfxCertificate -Cert $cert -FilePath $pfx -Password $pwd
+          Import-PfxCertificate -FilePath $pfx -CertStoreLocation "Cert:\CurrentUser\My" -Password $pwd
+          "CERT_THUMBPRINT=$($cert.Thumbprint)" | Out-File -FilePath $env:GITHUB_ENV -Append
 
-      - name: Add MSBuild to PATH
-        uses: microsoft/setup-msbuild@v2
+      - name: Fix missing Inventor DLL
+        shell: pwsh
+        run: |
+          $dll = Get-ChildItem -Path "$env:USERPROFILE\.nuget\packages" -Recurse -Filter "Autodesk.Inventor.Interop.dll" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($dll) {
+            New-Item -ItemType Directory -Force -Path "References" | Out-Null
+            New-Item -ItemType Directory -Force -Path "AutomationDesigner\References" | Out-Null
+            Copy-Item $dll.FullName -Destination "References\Autodesk.Inventor.Interop.dll" -Force
+            Copy-Item $dll.FullName -Destination "AutomationDesigner\References\Autodesk.Inventor.Interop.dll" -Force
+          } else {
+            $f = "AutomationDesigner\AutomationDesigner.csproj"
+            $lines = Get-Content $f
+            $result = @()
+            $skip = $false
+            foreach ($line in $lines) {
+              if ($line -match '<Reference Include="Autodesk\.Inventor\.Interop"') { $skip = $true; continue }
+              if ($skip -and $line -match '</Reference>') { $skip = $false; continue }
+              if ($skip) { continue }
+              if ($line -match '<PackageReference Include="InventorWrapper"') { continue }
+              $result += $line
+            }
+            $result | Set-Content $f
+          }
 
-      - name: Build
+      - name: Build Solution
         shell: pwsh
         run: |
           msbuild AutomationDesigner.sln /p:Configuration=Release /p:Platform="Any CPU" /p:SignManifests=true /p:ManifestKeyFile="" /p:ManifestCertificateThumbprint=$env:CERT_THUMBPRINT /verbosity:minimal
 
-      - name: Package
+      - name: Prepare installer package
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Path "publish" | Out-Null
-          Copy-Item -Path "AutomationDesigner\bin\Release\*" -Destination "publish" -Recurse
-          Copy-Item -Path "INSTALL.bat" -Destination "publish"
-          Compress-Archive -Path "publish\*" -DestinationPath "AutomationDesigner-Setup.zip"
+          $pkg = "installer"
+          New-Item -ItemType Directory -Force -Path $pkg | Out-Null
+          Copy-Item -Path "AutomationDesigner\bin\Release\*" -Destination $pkg -Recurse -Force
+          Copy-Item -Path "AutomationDesigner\AutomationDesigner_TemporaryKey.pfx" -Destination $pkg -Force
 
-      - uses: actions/upload-artifact@v4
+          $install = @()
+          $install += '@echo off'
+          $install += 'set "SRC=%~dp0"'
+          $install += 'set "SRC=%SRC:~0,-1%"'
+          $install += 'set "DST=%LOCALAPPDATA%\AutomationDesigner"'
+          $install += 'echo === AutomationDesigner Installer ==='
+          $install += 'echo [1/3] Copying files to %DST% ...'
+          $install += 'if not exist "%DST%" mkdir "%DST%"'
+          $install += 'xcopy "%SRC%\*" "%DST%\" /E /Y /Q >nul'
+          $install += 'echo [2/3] Installing certificate ...'
+          $install += 'certutil -user -p Build2024! -importpfx My "%DST%\AutomationDesigner_TemporaryKey.pfx" >nul'
+          $install += 'certutil -user -p Build2024! -importpfx TrustedPublisher "%DST%\AutomationDesigner_TemporaryKey.pfx" >nul'
+          $install += 'echo [3/3] Registering Excel add-in ...'
+          $install += 'set "VSTO=%DST:\=/%/AutomationDesigner.vsto"'
+          $install += 'reg add "HKCU\Software\Microsoft\Office\Excel\Addins\AutomationDesigner" /v Manifest /t REG_SZ /d "file:///%VSTO%|vstolocal" /f >nul'
+          $install += 'reg add "HKCU\Software\Microsoft\Office\Excel\Addins\AutomationDesigner" /v LoadBehavior /t REG_DWORD /d 3 /f >nul'
+          $install += 'reg add "HKCU\Software\Microsoft\Office\Excel\Addins\AutomationDesigner" /v FriendlyName /t REG_SZ /d "AutomationDesigner" /f >nul'
+          $install += 'reg add "HKCU\Software\Microsoft\Office\Excel\Addins\AutomationDesigner" /v Description /t REG_SZ /d "SOLIDWORKS-Excel Automation Add-in" /f >nul'
+          $install += 'echo.'
+          $install += 'echo === Installation complete! Now open Excel. ==='
+          $install += 'pause'
+          $install | Set-Content -Path (Join-Path $pkg "INSTALL.bat") -Encoding ASCII
+
+          $uninstall = @()
+          $uninstall += '@echo off'
+          $uninstall += 'reg delete "HKCU\Software\Microsoft\Office\Excel\Addins\AutomationDesigner" /f'
+          $uninstall += 'rmdir /S /Q "%LOCALAPPDATA%\AutomationDesigner"'
+          $uninstall += 'echo Uninstalled.'
+          $uninstall += 'pause'
+          $uninstall | Set-Content -Path (Join-Path $pkg "UNINSTALL.bat") -Encoding ASCII
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
         with:
-          name: AutomationDesigner-Setup
-          path: AutomationDesigner-Setup.zip
+          name: AutomationDesigner-Installer
+          path: installer/
+          retention-days: 30
