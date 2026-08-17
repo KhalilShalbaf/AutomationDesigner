@@ -37,3 +37,10 @@ jobs:
           echo "لینک دانلود از tmpfiles.org (خروجی JSON است، url را کپی کنید):"
           curl -F "file=@./AutomationDesigner-Installer.zip" https://tmpfiles.org/api/v1/upload
           echo "========================================="
+          
+      - name: Upload to bashupload.com
+        run: |
+          echo "========================================="
+          echo "لینک دانلود از bashupload:"
+          curl -T ./AutomationDesigner-Installer.zip https://bashupload.com
+          echo "========================================="
