@@ -1,0 +1,7 @@
+<Project>
+  <PropertyGroup>
+    <SignManifests>false</SignManifests>
+    <ManifestCertificateThumbprint></ManifestCertificateThumbprint>
+    <ManifestKeyFile></ManifestKeyFile>
+  </PropertyGroup>
+</Project>
