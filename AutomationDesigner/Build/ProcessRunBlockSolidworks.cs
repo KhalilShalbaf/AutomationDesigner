@@ -11,6 +11,7 @@ using Microsoft.Office.Interop.Excel;
 using SolidworksWrapper;
 using SolidworksWrapper.Documents;
 using AutomationDesigner.Constants;
+using AutomationDesigner.Logs;
 using AutomationDesigner.Enums;
 using AutomationDesigner.Helpers;
 using System.Collections.Specialized;
@@ -289,13 +290,17 @@ namespace AutomationDesigner.Build
                 SolidworksApplication.ActiveDocument.Save();
             }
         }
-                private void RunSolidworksMacro(string macroPath, string procName)
+        private void RunSolidworksMacro(string macroPath, string procName)
         {
             try
             {
                 if (string.IsNullOrEmpty(procName)) procName = "Main";
+
+                dynamic swApp = System.Runtime.InteropServices.Marshal.GetActiveObject("SldWorks.Application");
+
                 int error = 0;
-                SolidworksApplication.App.RunMacro2(macroPath, "", procName, 0, ref error);
+                swApp.RunMacro2(macroPath, "", procName, 0, ref error);
+
                 if (error != 0)
                 {
                     LogManager.Add($"Macro error code {error} in {macroPath}");
