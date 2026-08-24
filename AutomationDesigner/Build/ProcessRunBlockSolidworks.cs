@@ -157,6 +157,9 @@ namespace AutomationDesigner.Build
                     case Commands.GetEquationValue:
                         SetValue(i, value, _methods.GetEquation(_workingDocument, GetString(i, nameCol)));
                         break;
+                    case Commands.RunMacro:
+                        RunSolidworksMacro(GetString(i, nameCol), GetString(i, value));
+                        break;
                     case Commands.SetProperty:
                         _methods.SetProperty(_workingDocument, GetString(i, nameCol), GetString(i, value));
                         break;
@@ -284,6 +287,23 @@ namespace AutomationDesigner.Build
                 SolidworksApplication.ActiveDocument.ForceRebuildAll();
 
                 SolidworksApplication.ActiveDocument.Save();
+            }
+        }
+                private void RunSolidworksMacro(string macroPath, string procName)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(procName)) procName = "Main";
+                int error = 0;
+                SolidworksApplication.App.RunMacro2(macroPath, "", procName, 0, ref error);
+                if (error != 0)
+                {
+                    LogManager.Add($"Macro error code {error} in {macroPath}");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogManager.Add(ex.Message);
             }
         }
     }
