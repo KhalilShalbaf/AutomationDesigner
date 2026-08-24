@@ -16,6 +16,8 @@ namespace AutomationDesigner.Constants
 
         public const string GetEquationValue = "GET EQUATION";
 
+        public const string RunMacro = "RUN MACRO";
+
         public const string Dimension = "DIMENSION";
 
         public const string GetDimensionValue = "GET DIMENSION";
