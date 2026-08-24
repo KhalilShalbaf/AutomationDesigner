@@ -290,17 +290,21 @@ namespace AutomationDesigner.Build
                 SolidworksApplication.ActiveDocument.Save();
             }
         }
-        private void RunSolidworksMacro(string macroPath, string procName)
+                private void RunSolidworksMacro(string macroPath, string procName)
         {
             try
             {
                 if (string.IsNullOrEmpty(procName)) procName = "Main";
 
-                dynamic swApp = System.Runtime.InteropServices.Marshal.GetActiveObject("SldWorks.Application");
+                object swApp = System.Runtime.InteropServices.Marshal.GetActiveObject("SldWorks.Application");
+
+                object[] args = { macroPath, "", procName, 0, 0 };
+                swApp.GetType().InvokeMember("RunMacro2",
+                    System.Reflection.BindingFlags.InvokeMethod,
+                    null, swApp, args);
 
                 int error = 0;
-                swApp.RunMacro2(macroPath, "", procName, 0, ref error);
-
+                try { error = Convert.ToInt32(args[4]); } catch { }
                 if (error != 0)
                 {
                     LogManager.Add($"Macro error code {error} in {macroPath}");
