@@ -296,11 +296,26 @@ namespace AutomationDesigner.Build
             {
                 if (string.IsNullOrEmpty(procName)) procName = "Main";
 
-                var field = typeof(SolidworksApplication).GetField("_solidWorks",
-                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
-                object swApp = field.GetValue(null);
+                object swApp = null;
 
-                var method = swApp.GetType().GetMethod("RunMacro2");
+                var field = typeof(SolidworksApplication).GetField("_solidWorks",
+                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic |
+                    System.Reflection.BindingFlags.Static);
+
+                if (field != null) swApp = field.GetValue(null);
+
+                if (swApp == null)
+                {
+                    swApp = System.Runtime.InteropServices.Marshal.GetActiveObject("SldWorks.Application");
+                }
+
+                if (swApp == null) throw new Exception("Could not get SOLIDWORKS application object");
+
+                var method = swApp.GetType().GetMethod("RunMacro2",
+                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+
+                if (method == null) throw new Exception($"RunMacro2 not found on type {swApp.GetType().FullName}");
+
                 object[] args = { macroPath, "", procName, 0, 0 };
                 method.Invoke(swApp, args);
 
@@ -312,8 +327,8 @@ namespace AutomationDesigner.Build
             }
             catch (Exception ex)
             {
-                var inner = ex.InnerException != null ? ex.InnerException.Message : "";
-                LogManager.Add($"RunMacro failed: {ex.Message} {inner}");
+                var inner = ex.InnerException != null ? " | Inner: " + ex.InnerException.Message : "";
+                LogManager.Add($"RunMacro failed: {ex.Message}{inner}");
             }
         }
     }
