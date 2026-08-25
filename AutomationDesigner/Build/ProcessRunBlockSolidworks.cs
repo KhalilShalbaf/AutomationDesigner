@@ -290,40 +290,17 @@ namespace AutomationDesigner.Build
                 SolidworksApplication.ActiveDocument.Save();
             }
         }
-                private void RunSolidworksMacro(string macroPath, string procName)
+                        private void RunSolidworksMacro(string macroPath, string procName)
         {
             try
             {
                 if (string.IsNullOrEmpty(procName)) procName = "Main";
 
-                object swApp = null;
+                object swApp = System.Runtime.InteropServices.Marshal.GetActiveObject("SldWorks.Application");
 
-                var field = typeof(SolidworksApplication).GetField("_solidWorks",
-                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic |
-                    System.Reflection.BindingFlags.Static);
-
-                if (field != null) swApp = field.GetValue(null);
-
-                if (swApp == null)
-                {
-                    swApp = System.Runtime.InteropServices.Marshal.GetActiveObject("SldWorks.Application");
-                }
-
-                if (swApp == null) throw new Exception("Could not get SOLIDWORKS application object");
-
-                var method = swApp.GetType().GetMethod("RunMacro2",
-                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-
-                if (method == null) throw new Exception($"RunMacro2 not found on type {swApp.GetType().FullName}");
-
-                object[] args = { macroPath, "", procName, 0, 0 };
-                method.Invoke(swApp, args);
-
-                int error = Convert.ToInt32(args[4]);
-                if (error != 0)
-                {
-                    LogManager.Add($"Macro error code {error} in {macroPath}");
-                }
+                object[] args = { macroPath, "", procName };
+                swApp.GetType().InvokeMember("RunMacro",
+                    System.Reflection.BindingFlags.InvokeMethod, null, swApp, args);
             }
             catch (Exception ex)
             {
