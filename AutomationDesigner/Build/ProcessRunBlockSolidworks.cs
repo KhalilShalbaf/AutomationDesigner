@@ -296,15 +296,15 @@ namespace AutomationDesigner.Build
             {
                 if (string.IsNullOrEmpty(procName)) procName = "Main";
 
-                object swApp = System.Runtime.InteropServices.Marshal.GetActiveObject("SldWorks.Application");
+                var field = typeof(SolidworksApplication).GetField("_solidWorks",
+                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+                object swApp = field.GetValue(null);
 
+                var method = swApp.GetType().GetMethod("RunMacro2");
                 object[] args = { macroPath, "", procName, 0, 0 };
-                swApp.GetType().InvokeMember("RunMacro2",
-                    System.Reflection.BindingFlags.InvokeMethod,
-                    null, swApp, args);
+                method.Invoke(swApp, args);
 
-                int error = 0;
-                try { error = Convert.ToInt32(args[4]); } catch { }
+                int error = Convert.ToInt32(args[4]);
                 if (error != 0)
                 {
                     LogManager.Add($"Macro error code {error} in {macroPath}");
@@ -312,7 +312,8 @@ namespace AutomationDesigner.Build
             }
             catch (Exception ex)
             {
-                LogManager.Add(ex.Message);
+                var inner = ex.InnerException != null ? ex.InnerException.Message : "";
+                LogManager.Add($"RunMacro failed: {ex.Message} {inner}");
             }
         }
     }
