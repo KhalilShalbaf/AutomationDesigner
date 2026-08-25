@@ -290,11 +290,17 @@ namespace AutomationDesigner.Build
                 SolidworksApplication.ActiveDocument.Save();
             }
         }
-                        private void RunSolidworksMacro(string macroPath, string procName)
+                private void RunSolidworksMacro(string macroPath, string procName)
         {
             try
             {
                 if (string.IsNullOrEmpty(procName)) procName = "Main";
+
+                if (!System.IO.Path.IsPathRooted(macroPath))
+                {
+                    var workbook = (Excel.Workbook)_worksheet.Parent;
+                    macroPath = System.IO.Path.Combine(workbook.Path, macroPath);
+                }
 
                 object swApp = System.Runtime.InteropServices.Marshal.GetActiveObject("SldWorks.Application");
 
