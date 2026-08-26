@@ -326,52 +326,42 @@ namespace AutomationDesigner.Build
                 null, target, null);
         }
 
-                private string GetViewScale(string viewName)
+                        private string GetViewScale(string viewName)
         {
             try
             {
+                if (string.IsNullOrWhiteSpace(viewName))
+                {
+                    LogManager.Add("GET VIEW SCALE: please specify a view name");
+                    return "";
+                }
+
                 object swApp = System.Runtime.InteropServices.Marshal.GetActiveObject("SldWorks.Application");
                 object doc = Late(swApp, "ActiveDoc", true);
                 if (doc == null) return "";
 
-                Type drawingType = null;
-                foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
-                {
-                    drawingType = asm.GetType("SolidWorks.Interop.sldworks.IDrawingDoc");
-                    if (drawingType != null) break;
-                }
+                object ext = Late(doc, "Extension", true);
+                object[] selArgs = { viewName, "DrawingView", 0.0, 0.0, 0.0, false, 0, null, 0 };
+                bool ok = (bool)ext.GetType().InvokeMember("SelectByID2",
+                    System.Reflection.BindingFlags.InvokeMethod, null, ext, selArgs);
 
-                if (drawingType == null)
+                if (!ok)
                 {
-                    LogManager.Add("IDrawingDoc type not loaded");
+                    LogManager.Add($"Could not find view {viewName}");
                     return "";
                 }
 
-                if (string.IsNullOrWhiteSpace(viewName))
-                {
-                    object sheet = drawingType.InvokeMember("GetCurrentSheet",
-                        System.Reflection.BindingFlags.InvokeMethod, null, doc, null);
-                    return Convert.ToDouble(Late(sheet, "Scale", true))
-                        .ToString(System.Globalization.CultureInfo.InvariantCulture);
-                }
+                object selMgr = Late(doc, "SelectionManager", true);
+                object[] getArgs = { 1, -1 };
+                object view = selMgr.GetType().InvokeMember("GetSelectedObject6",
+                    System.Reflection.BindingFlags.InvokeMethod, null, selMgr, getArgs);
 
-                object view = drawingType.InvokeMember("GetFirstView",
-                    System.Reflection.BindingFlags.InvokeMethod, null, doc, null);
+                Late(doc, "ClearSelection");
 
-                while (view != null)
-                {
-                    var name = (string)Late(view, "Name", true);
-                    if (string.Equals(name, viewName, StringComparison.OrdinalIgnoreCase))
-                    {
-                        return Convert.ToDouble(Late(view, "Scale", true))
-                            .ToString(System.Globalization.CultureInfo.InvariantCulture);
-                    }
-                    view = drawingType.InvokeMember("GetNextView",
-                        System.Reflection.BindingFlags.InvokeMethod, null, doc, null);
-                }
+                if (view == null) return "";
 
-                LogManager.Add($"Could not find view {viewName}");
-                return "";
+                return Convert.ToDouble(Late(view, "Scale", true))
+                    .ToString(System.Globalization.CultureInfo.InvariantCulture);
             }
             catch (Exception ex)
             {
