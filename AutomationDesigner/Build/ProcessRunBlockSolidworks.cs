@@ -326,7 +326,7 @@ namespace AutomationDesigner.Build
                 null, target, null);
         }
 
-                        private string GetViewScale(string viewName)
+                 private string GetViewScale(string viewName)
         {
             try
             {
@@ -336,14 +336,26 @@ namespace AutomationDesigner.Build
                     return "";
                 }
 
+                LogManager.Add($"Getting view scale for: {viewName}");
+
                 object swApp = System.Runtime.InteropServices.Marshal.GetActiveObject("SldWorks.Application");
                 object doc = Late(swApp, "ActiveDoc", true);
-                if (doc == null) return "";
+                if (doc == null)
+                {
+                    LogManager.Add("ActiveDoc is null");
+                    return "";
+                }
+
+                LogManager.Add("Got ActiveDoc");
 
                 object ext = Late(doc, "Extension", true);
-                object[] selArgs = { viewName, "DrawingView", 0.0, 0.0, 0.0, false, 0, null, 0 };
+                LogManager.Add("Got Extension");
+
+                object[] selArgs = { viewName, "DrawingView", 0.0, 0.0, 0.0, false, 0, System.Reflection.Missing.Value, 0 };
                 bool ok = (bool)ext.GetType().InvokeMember("SelectByID2",
                     System.Reflection.BindingFlags.InvokeMethod, null, ext, selArgs);
+
+                LogManager.Add($"SelectByID2 returned: {ok}");
 
                 if (!ok)
                 {
@@ -352,20 +364,31 @@ namespace AutomationDesigner.Build
                 }
 
                 object selMgr = Late(doc, "SelectionManager", true);
+                LogManager.Add("Got SelectionManager");
+
                 object[] getArgs = { 1, -1 };
                 object view = selMgr.GetType().InvokeMember("GetSelectedObject6",
                     System.Reflection.BindingFlags.InvokeMethod, null, selMgr, getArgs);
 
+                LogManager.Add("Got SelectedObject");
+
                 Late(doc, "ClearSelection");
 
-                if (view == null) return "";
+                if (view == null)
+                {
+                    LogManager.Add("Selected view object is null");
+                    return "";
+                }
+
+                LogManager.Add("Getting Scale property");
 
                 return Convert.ToDouble(Late(view, "Scale", true))
                     .ToString(System.Globalization.CultureInfo.InvariantCulture);
             }
             catch (Exception ex)
             {
-                LogManager.Add(ex.Message);
+                var innerMsg = ex.InnerException != null ? $" | Inner: {ex.InnerException.Message}" : "";
+                LogManager.Add($"GetViewScale failed: {ex.Message}{innerMsg}");
                 return "";
             }
         }
