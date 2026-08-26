@@ -326,7 +326,7 @@ namespace AutomationDesigner.Build
                 null, target, null);
         }
 
-                private string GetViewScale(string viewName)
+                        private string GetViewScale(string viewName)
         {
             try
             {
@@ -334,22 +334,29 @@ namespace AutomationDesigner.Build
                 object doc = Late(swApp, "ActiveDoc", true);
                 if (doc == null) return "";
 
-                var drawing = (SolidWorks.Interop.sldworks.IDrawingDoc)doc;
+                var dir = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
+                var asm = System.Reflection.Assembly.LoadFrom(System.IO.Path.Combine(dir, "SolidWorks.Interop.sldworks.dll"));
+                var tDrawing = asm.GetType("SolidWorks.Interop.sldworks.IDrawingDoc");
+                var tView = asm.GetType("SolidWorks.Interop.sldworks.IView");
+                var tSheet = asm.GetType("SolidWorks.Interop.sldworks.ISheet");
 
                 if (string.IsNullOrWhiteSpace(viewName))
                 {
-                    var sheet = (SolidWorks.Interop.sldworks.ISheet)drawing.GetCurrentSheet();
-                    return sheet.Scale.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    object sheet = tDrawing.InvokeMember("GetCurrentSheet", System.Reflection.BindingFlags.InvokeMethod, null, doc, null);
+                    object sc = tSheet.InvokeMember("Scale", System.Reflection.BindingFlags.GetProperty, null, sheet, null);
+                    return Convert.ToDouble(sc).ToString(System.Globalization.CultureInfo.InvariantCulture);
                 }
 
-                var view = (SolidWorks.Interop.sldworks.IView)drawing.GetFirstView();
+                object view = tDrawing.InvokeMember("GetFirstView", System.Reflection.BindingFlags.InvokeMethod, null, doc, null);
                 while (view != null)
                 {
-                    if (string.Equals(view.Name, viewName, StringComparison.OrdinalIgnoreCase))
+                    object nm = tView.InvokeMember("Name", System.Reflection.BindingFlags.GetProperty, null, view, null);
+                    if (string.Equals((string)nm, viewName, StringComparison.OrdinalIgnoreCase))
                     {
-                        return view.Scale.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                        object sc = tView.InvokeMember("Scale", System.Reflection.BindingFlags.GetProperty, null, view, null);
+                        return Convert.ToDouble(sc).ToString(System.Globalization.CultureInfo.InvariantCulture);
                     }
-                    view = (SolidWorks.Interop.sldworks.IView)drawing.GetNextView();
+                    view = tDrawing.InvokeMember("GetNextView", System.Reflection.BindingFlags.InvokeMethod, null, doc, null);
                 }
 
                 LogManager.Add($"Could not find view {viewName}");
