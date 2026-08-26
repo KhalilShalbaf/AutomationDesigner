@@ -326,45 +326,78 @@ namespace AutomationDesigner.Build
                 null, target, null);
         }
 
-                        private string GetViewScale(string viewName)
+                                private string GetViewScale(string viewName)
         {
             try
             {
+                // ۱. گرفتن سند فعال
                 object swApp = System.Runtime.InteropServices.Marshal.GetActiveObject("SldWorks.Application");
                 object doc = Late(swApp, "ActiveDoc", true);
-                if (doc == null) return "";
+                if (doc == null)
+                {
+                    LogManager.Add("ActiveDoc is null");
+                    return "";
+                }
 
+                // ۲. لود داینامیک DLL کامل اینترفیس (برای دور زدن نسخه هرس‌شده wrapper)
                 var dir = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
-                var asm = System.Reflection.Assembly.LoadFrom(System.IO.Path.Combine(dir, "SolidWorks.Interop.sldworks.dll"));
+                var dllPath = System.IO.Path.Combine(dir, "SolidWorks.Interop.sldworks.dll");
+
+                if (!System.IO.File.Exists(dllPath))
+                {
+                    LogManager.Add($"Interop DLL not found at: {dllPath}");
+                    return "";
+                }
+
+                var asm = System.Reflection.Assembly.LoadFrom(dllPath);
                 var tDrawing = asm.GetType("SolidWorks.Interop.sldworks.IDrawingDoc");
                 var tView = asm.GetType("SolidWorks.Interop.sldworks.IView");
                 var tSheet = asm.GetType("SolidWorks.Interop.sldworks.ISheet");
 
+                if (tDrawing == null || tView == null)
+                {
+                    LogManager.Add("Failed to load IDrawingDoc or IView types.");
+                    return "";
+                }
+
+                // ۳. اگر نام ویو خالی بود، مقیاس شیت فعال را برگردان
                 if (string.IsNullOrWhiteSpace(viewName))
                 {
                     object sheet = tDrawing.InvokeMember("GetCurrentSheet", System.Reflection.BindingFlags.InvokeMethod, null, doc, null);
-                    object sc = tSheet.InvokeMember("Scale", System.Reflection.BindingFlags.GetProperty, null, sheet, null);
-                    return Convert.ToDouble(sc).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    if (sheet != null)
+                    {
+                        object scaleObj = tSheet.InvokeMember("Scale", System.Reflection.BindingFlags.GetProperty, null, sheet, null);
+                        return Convert.ToDouble(scaleObj).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    }
+                    LogManager.Add("Could not get current sheet.");
+                    return "";
                 }
 
+                // ۴. جستجو در بین ویوها برای پیدا کردن نام مطابق
                 object view = tDrawing.InvokeMember("GetFirstView", System.Reflection.BindingFlags.InvokeMethod, null, doc, null);
+
                 while (view != null)
                 {
-                    object nm = tView.InvokeMember("Name", System.Reflection.BindingFlags.GetProperty, null, view, null);
-                    if (string.Equals((string)nm, viewName, StringComparison.OrdinalIgnoreCase))
+                    object nameObj = tView.InvokeMember("Name", System.Reflection.BindingFlags.GetProperty, null, view, null);
+                    string currentName = nameObj?.ToString();
+
+                    if (!string.IsNullOrEmpty(currentName) && currentName.Equals(viewName, StringComparison.OrdinalIgnoreCase))
                     {
-                        object sc = tView.InvokeMember("Scale", System.Reflection.BindingFlags.GetProperty, null, view, null);
-                        return Convert.ToDouble(sc).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                        object scaleObj = tView.InvokeMember("Scale", System.Reflection.BindingFlags.GetProperty, null, view, null);
+                        return Convert.ToDouble(scaleObj).ToString(System.Globalization.CultureInfo.InvariantCulture);
                     }
+
+                    // رفتن به ویوی بعدی
                     view = tDrawing.InvokeMember("GetNextView", System.Reflection.BindingFlags.InvokeMethod, null, doc, null);
                 }
 
-                LogManager.Add($"Could not find view {viewName}");
+                LogManager.Add($"Could not find view named: {viewName}");
                 return "";
             }
             catch (Exception ex)
             {
-                LogManager.Add(ex.Message);
+                var innerMsg = ex.InnerException != null ? $" | Inner: {ex.InnerException.Message}" : "";
+                LogManager.Add($"GetViewScale failed: {ex.Message}{innerMsg}");
                 return "";
             }
         }
