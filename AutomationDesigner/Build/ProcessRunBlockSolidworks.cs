@@ -326,7 +326,7 @@ namespace AutomationDesigner.Build
                 null, target, null);
         }
 
-        private string GetViewScale(string viewName)
+                private string GetViewScale(string viewName)
         {
             try
             {
@@ -334,21 +334,40 @@ namespace AutomationDesigner.Build
                 object doc = Late(swApp, "ActiveDoc", true);
                 if (doc == null) return "";
 
-                if (string.IsNullOrWhiteSpace(viewName))
+                Type drawingType = null;
+                foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
                 {
-                    object sheet = Late(doc, "GetCurrentSheet");
-                    return Convert.ToDouble(Late(sheet, "Scale", true)).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    drawingType = asm.GetType("SolidWorks.Interop.sldworks.IDrawingDoc");
+                    if (drawingType != null) break;
                 }
 
-                object view = Late(doc, "GetFirstView");
+                if (drawingType == null)
+                {
+                    LogManager.Add("IDrawingDoc type not loaded");
+                    return "";
+                }
+
+                if (string.IsNullOrWhiteSpace(viewName))
+                {
+                    object sheet = drawingType.InvokeMember("GetCurrentSheet",
+                        System.Reflection.BindingFlags.InvokeMethod, null, doc, null);
+                    return Convert.ToDouble(Late(sheet, "Scale", true))
+                        .ToString(System.Globalization.CultureInfo.InvariantCulture);
+                }
+
+                object view = drawingType.InvokeMember("GetFirstView",
+                    System.Reflection.BindingFlags.InvokeMethod, null, doc, null);
+
                 while (view != null)
                 {
                     var name = (string)Late(view, "Name", true);
                     if (string.Equals(name, viewName, StringComparison.OrdinalIgnoreCase))
                     {
-                        return Convert.ToDouble(Late(view, "Scale", true)).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                        return Convert.ToDouble(Late(view, "Scale", true))
+                            .ToString(System.Globalization.CultureInfo.InvariantCulture);
                     }
-                    view = Late(doc, "GetNextView");
+                    view = drawingType.InvokeMember("GetNextView",
+                        System.Reflection.BindingFlags.InvokeMethod, null, doc, null);
                 }
 
                 LogManager.Add($"Could not find view {viewName}");
