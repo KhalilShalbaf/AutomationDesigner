@@ -18,6 +18,8 @@ namespace AutomationDesigner.Constants
 
         public const string RunMacro = "RUN MACRO";
 
+        public const string GetViewScale = "GET VIEW SCALE";
+
         public const string Dimension = "DIMENSION";
 
         public const string GetDimensionValue = "GET DIMENSION";
