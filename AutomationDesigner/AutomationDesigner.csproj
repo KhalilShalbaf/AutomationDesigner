@@ -14,7 +14,7 @@
     NoStandardLibraries
       Set to "false" for VSTO.
     RootNamespace
-      In C#, this specifies the namespace given to new files. In VB, all objects are
+      In C#, this specifies the namespace given to new files . In VB, all objects are
       wrapped in this namespace at runtime.
   -->
   <PropertyGroup>
