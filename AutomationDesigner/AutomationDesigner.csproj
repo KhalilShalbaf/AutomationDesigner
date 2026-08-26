@@ -438,4 +438,10 @@
       </FlavorProperties>
     </VisualStudio>
   </ProjectExtensions>
+  <ItemGroup>
+    <Reference Include="SolidWorks.Interop.sldworks">
+      <HintPath>References\SolidWorks.Interop.sldworks.dll</HintPath>
+      <EmbedInteropTypes>True</EmbedInteropTypes>
+    </Reference>
+  </ItemGroup>
 </Project>
