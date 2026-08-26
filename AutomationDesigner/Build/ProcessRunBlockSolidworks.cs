@@ -161,6 +161,9 @@ namespace AutomationDesigner.Build
                     case Commands.RunMacro:
                         RunSolidworksMacro(GetString(i, nameCol), GetString(i, value));
                         break;
+                    case Commands.GetViewScale:
+                        SetValue(i, value, GetViewScale(GetString(i, nameCol)));
+                        break;
                     case Commands.SetProperty:
                         _methods.SetProperty(_workingDocument, GetString(i, nameCol), GetString(i, value));
                         break;
@@ -314,5 +317,49 @@ namespace AutomationDesigner.Build
                 LogManager.Add($"RunMacro failed: {ex.Message}{inner}");
             }
         }
+
+
+                private static object Late(object target, string member, bool isProperty = false)
+        {
+            return target.GetType().InvokeMember(member,
+                isProperty ? System.Reflection.BindingFlags.GetProperty : System.Reflection.BindingFlags.InvokeMethod,
+                null, target, null);
+        }
+
+        private string GetViewScale(string viewName)
+        {
+            try
+            {
+                object swApp = System.Runtime.InteropServices.Marshal.GetActiveObject("SldWorks.Application");
+                object doc = Late(swApp, "ActiveDoc", true);
+                if (doc == null) return "";
+
+                if (string.IsNullOrWhiteSpace(viewName))
+                {
+                    object sheet = Late(doc, "GetCurrentSheet");
+                    return Convert.ToDouble(Late(sheet, "Scale", true)).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                }
+
+                object view = Late(doc, "GetFirstView");
+                while (view != null)
+                {
+                    var name = (string)Late(view, "Name", true);
+                    if (string.Equals(name, viewName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return Convert.ToDouble(Late(view, "Scale", true)).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    }
+                    view = Late(doc, "GetNextView");
+                }
+
+                LogManager.Add($"Could not find view {viewName}");
+                return "";
+            }
+            catch (Exception ex)
+            {
+                LogManager.Add(ex.Message);
+                return "";
+            }
+        }
+        
     }
 }
